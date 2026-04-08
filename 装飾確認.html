@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTMLメールプレビュアー</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e2e2de;
+    --border-strong: #c8c8c2;
+    --text: #1a1a18;
+    --text-muted: #888884;
+    --accent: #1a1a18;
+    --accent-fg: #ffffff;
+    --font-mono: 'Menlo', 'Monaco', 'Consolas', monospace;
+    --font-ui: -apple-system, 'Helvetica Neue', sans-serif;
+    --radius: 6px;
+  }
+
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: var(--font-ui);
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── toolbar ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    height: 44px;
+  }
+
+  .toolbar-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-right: 8px;
+  }
+
+  .seg {
+    display: flex;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .seg-btn {
+    font-size: 12px;
+    padding: 4px 11px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: background 0.1s, color 0.1s;
+    font-family: var(--font-ui);
+    border-right: 1px solid var(--border-strong);
+  }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn:hover { background: var(--bg); color: var(--text); }
+  .seg-btn.active { background: var(--accent); color: var(--accent-fg); }
+
+  .spacer { flex: 1; }
+
+  .btn-clear {
+    font-size: 12px;
+    padding: 4px 11px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    transition: background 0.1s;
+  }
+  .btn-clear:hover { background: var(--bg); color: var(--text); }
+
+  /* ── main layout ── */
+  .main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+  }
+
+  /* ── editor pane ── */
+  .editor-pane {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .pane-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+
+  textarea {
+    flex: 1;
+    width: 100%;
+    padding: 14px;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.65;
+    background: var(--surface);
+    color: var(--text);
+    tab-size: 2;
+  }
+  textarea::placeholder { color: #bbbbb6; }
+
+  /* ── preview pane ── */
+  .preview-pane {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .preview-inner {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .device-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: 1px solid var(--border);
+  }
+  .device-col:first-child { border-left: none; }
+
+  .device-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border-strong);
+  }
+
+  iframe {
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: #ffffff;
+  }
+
+  /* ── empty state ── */
+  .empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .empty-icon {
+    width: 36px; height: 36px;
+    border: 1.5px dashed var(--border-strong);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .empty-icon svg { width: 18px; height: 18px; opacity: 0.4; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="toolbar-title">メールプレビュアー</span>
+  <div class="seg">
+    <button class="seg-btn active" id="btn-both">PC + スマホ</button>
+    <button class="seg-btn" id="btn-pc">PC</button>
+    <button class="seg-btn" id="btn-sp">スマホ</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn-clear" id="btn-clear">クリア</button>
+</div>
+
+<div class="main">
+  <div class="editor-pane">
+    <div class="pane-label">HTML コード</div>
+    <textarea id="editor" placeholder="ここにHTMLメールのコードを貼り付けてください...
+
+リアルタイムでプレビューに反映されます。"></textarea>
+  </div>
+
+  <div class="preview-pane">
+    <div class="pane-label">プレビュー</div>
+    <div class="preview-inner" id="preview-inner">
+      <div class="empty" id="empty-state">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <path d="M3 9l9 6 9-6"/>
+          </svg>
+        </div>
+        <span>コードを入力するとプレビューが表示されます</span>
+      </div>
+      <div id="preview-row" style="display:none; flex:1; overflow:hidden;">
+        <div class="device-col" id="pc-col">
+          <div class="device-label"><div class="dot"></div>PC（600px）</div>
+          <iframe id="iframe-pc" title="PC preview"></iframe>
+        </div>
+        <div class="device-col" id="sp-col">
+          <div class="device-label"><div class="dot"></div>スマホ（375px）</div>
+          <iframe id="iframe-sp" title="スマホ preview"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const editor    = document.getElementById('editor');
+  const iframePc  = document.getElementById('iframe-pc');
+  const iframeSp  = document.getElementById('iframe-sp');
+  const emptyState= document.getElementById('empty-state');
+  const previewRow= document.getElementById('preview-row');
+  const pcCol     = document.getElementById('pc-col');
+  const spCol     = document.getElementById('sp-col');
+
+  let mode = 'both';
+  let debounce = null;
+
+  function wrap(html, maxWidth) {
+    return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body { margin: 0; padding: 16px; background: #f4f4f2; display: flex; justify-content: center; }
+  .wrap { background: #fff; width: 100%; max-width: ${maxWidth}px; }
+</style>
+</head>
+<body><div class="wrap">${html}</div></body>
+</html>`;
+  }
+
+  function render() {
+    const code = editor.value.trim();
+    if (!code) {
+      emptyState.style.display = 'flex';
+      previewRow.style.display = 'none';
+      return;
+    }
+    emptyState.style.display = 'none';
+    previewRow.style.display = 'flex';
+    iframePc.srcdoc = wrap(code, 600);
+    iframeSp.srcdoc = wrap(code, 375);
+  }
+
+  editor.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(render, 200);
+  });
+
+  function setMode(m) {
+    mode = m;
+    ['both','pc','sp'].forEach(k => {
+      document.getElementById('btn-' + k).classList.toggle('active', k === m);
+    });
+    if (m === 'both') { pcCol.style.display = ''; spCol.style.display = ''; }
+    else if (m === 'pc') { pcCol.style.display = ''; spCol.style.display = 'none'; }
+    else { pcCol.style.display = 'none'; spCol.style.display = ''; }
+  }
+
+  document.getElementById('btn-both').addEventListener('click', () => setMode('both'));
+  document.getElementById('btn-pc').addEventListener('click',   () => setMode('pc'));
+  document.getElementById('btn-sp').addEventListener('click',   () => setMode('sp'));
+  document.getElementById('btn-clear').addEventListener('click', () => { editor.value = ''; render(); });
+</script>
+</body>
+</html>
